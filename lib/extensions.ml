@@ -18,6 +18,20 @@ module String = struct
           | _ -> acc
         in
         span' ("", "") cs
+
+  let dropWhile f = function
+    | "" -> ""
+    | cs ->
+        let rec dropWhile' cs' =
+          let hd' = hd cs' in
+          match cs' with
+          | "" -> cs'
+          | cs'' when f hd' ->
+              let rest = tl cs'' in
+              dropWhile' rest
+          | _ -> cs'
+        in
+        dropWhile' cs
 end
 
 module Char = struct
