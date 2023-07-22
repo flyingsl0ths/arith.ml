@@ -3,6 +3,7 @@ module String = struct
 
   let tl cs = String.sub cs 1 @@ (String.length cs - 1)
   let hd = function "" -> ' ' | cs -> String.get cs 0
+  let null = function "" -> true | _ -> false
 
   let span f = function
     | "" -> ("", "")
