@@ -12,7 +12,7 @@ module String = struct
           let hd' = hd cs' in
           match cs' with
           | "" -> acc
-          | cs'' when not @@ f hd' ->
+          | cs'' when f hd' ->
               let rest = tl cs'' in
               span' (fst acc ^ Char.escaped @@ hd', rest) rest
           | _ -> acc
