@@ -1,2 +1,3 @@
 (test
- (name arith))
+ (name lexer)
+ (libraries arith ounit2))
