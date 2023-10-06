@@ -1,3 +1,9 @@
+module Array = struct
+  include Array
+
+  let tl = function _ :: cs -> cs | [] -> []
+end
+
 module String = struct
   include String
 
@@ -32,6 +38,26 @@ module String = struct
           | _ -> cs'
         in
         dropWhile' cs
+
+  let rec drop n cs =
+    let length' = length cs in
+    match cs with
+    | "" -> ""
+    | _ when n > length' -> cs
+    | _ when n < length' -> ""
+    | _ when n != 0 -> drop (n - 1) @@ tl cs
+    | _ -> cs
+
+  let take n = function
+    | "" -> ""
+    | cs when n > 0 && n <= length cs ->
+        let rec take' n acc = function
+          | cs' when n != 0 ->
+              take' (n - 1) (tl cs') (acc ^ Char.escaped @@ hd cs')
+          | cs' -> cs'
+        in
+        take' n cs ""
+    | cs -> cs
 end
 
 module Char = struct
