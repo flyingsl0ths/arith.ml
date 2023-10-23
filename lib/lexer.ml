@@ -25,9 +25,9 @@ type token =
   | Error of string
 
 let lexer source = { source; column = 0; was_last_token_an_op = false }
+let ( <<< ) f g x = f @@ g x
 
 let funcs =
-  let ( <<< ) f g x = f @@ g x in
   let recip n = 1.0 /. n in
   let to_radians x = x *. (Float.pi /. 180.) in
   let to_degrees x = x *. (180. /. Float.pi) in
@@ -103,9 +103,8 @@ let single_char_token is_unary_minus = function
   | '^' -> Operator ('^', Factor, Binary (fun x y -> x ** y), is_left_assoc '^')
   | '-' when not is_unary_minus ->
       Operator ('-', Term, Binary ( -. ), is_left_assoc '-')
-  | '-' when is_unary_minus ->
-      Operator ('-', Unary, Unary (fun n -> -.n), is_left_assoc '-')
-  | '!' -> Operator ('!', Unary, Unary factorial, is_left_assoc '!')
+  | '-' when is_unary_minus -> Function { name = "-"; f = Unary (fun n -> -.n) }
+  | '!' -> Function { name = "!"; f = Unary factorial }
   | '(' -> LParen
   | ')' -> RParen
   | ',' -> Comma
@@ -125,12 +124,34 @@ let make_func ({ source; column; _ } as lexer) fs =
         } )
   | None -> (Error "Unknown function name", lexer)
 
-let match_functions_or_error lexer = function
+let is_name source func_name =
+  let len = String.length source in
+  let func_name_length = String.length func_name in
+  len >= func_name_length && String.take func_name_length source == func_name
+
+let is_not_exp_functions source =
+  (not @@ is_name source "exp") || (not @@ is_name source "exp2")
+
+let match_functions_or_error ({ source; column; _ } as lexer) = function
   | 'a' ->
       make_func lexer [ "abs"; "acos"; "acot"; "acsc"; "asec"; "asin"; "atan" ]
   | 'c' -> make_func lexer [ "ceil"; "cosh"; "cos"; "cot"; "csc" ]
+  | 'e' when String.length source == 1 || is_not_exp_functions source ->
+      ( Num 2.71828182845904523536028747135266250,
+        {
+          source = String.tl source;
+          column = column + 1;
+          was_last_token_an_op = false;
+        } )
   | 'e' -> make_func lexer [ "exp2"; "exp" ]
   | 'l' -> make_func lexer [ "ln"; "log10"; "log" ]
+  | 'p' when is_name source "pi" ->
+      ( Num Float.pi,
+        {
+          source = String.drop 2 source;
+          column = column + 2;
+          was_last_token_an_op = false;
+        } )
   | 'r' -> make_func lexer [ "rad"; "round" ]
   | 's' -> make_func lexer [ "sec"; "sinh"; "sin"; "sqrt" ]
   | 't' -> make_func lexer [ "tanh"; "tan" ]
@@ -153,7 +174,11 @@ let is_unary_minus { source; column; was_last_token_an_op; _ } =
   let first = String.hd source in
   (was_last_token_an_op && first == '-')
   || (first == '-' && peek source == '(')
-  || (column == 0 && first == '-')
+  || column == 0
+     && String.length source >= 2
+     &&
+     let second = (String.hd <<< String.tl <<< String.tl) source in
+     Char.is_digit second || second == '-'
 
 let parse_num source column =
   let num, rest = String.span (fun c -> Char.is_digit c || c = '.') source in
@@ -162,9 +187,8 @@ let parse_num source column =
       (fun count current -> if current == '.' then count + 1 else count)
       0
   in
-  let total_decimals = count_decimals num in
   let tk =
-    if total_decimals > 1 then
+    if count_decimals num > 1 then
       Error
         ("Syntax error(1," ^ string_of_int column
        ^ "): floating point number cannot contain more than one '.'")
@@ -180,14 +204,13 @@ let parse_num source column =
 let rec lex ({ source; column; _ } as lexer) =
   if String.null source then (Eof, lexer)
   else
-    let column' = column + 1 in
     match String.hd source with
     | c when discard c -> lex @@ skip_whitespace lexer
     | c when is_single c ->
         ( single_char_token (is_unary_minus lexer) c,
           {
             source = String.tl source;
-            column = column';
+            column = column + 1;
             was_last_token_an_op = is_op c;
           } )
     | d when Char.is_digit d -> parse_num source column
