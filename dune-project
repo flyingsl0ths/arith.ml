@@ -5,20 +5,20 @@
 (generate_opam_files true)
 
 (source
- (github username/reponame))
+ (github flyingsl0ths/arith.ml))
 
-(authors "Author Name")
+(authors "flyingsl0ths")
 
-(maintainers "Maintainer Name")
+(maintainers "flyingsl0ths")
 
 (license LICENSE)
 
-(documentation https://url/to/documentation)
+; (documentation https://url/to/documentation)
 
 (package
  (name arith)
- (synopsis "A short synopsis")
- (description "A longer description")
+ (synopsis "A bc clone")
+ (description "A cli calculator")
  (depends ocaml dune)
  (tags
   (topics "to describe" your project)))
