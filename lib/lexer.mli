@@ -1,25 +1,26 @@
 type t = private { source : string; column : int; was_last_token_an_op : bool }
 
-type precedence = private
+type precedence =
+  | None
   | Term
   (*  + - *)
   | Factor
   (* * / % ^ *)
   | Unary (* ! - *)
 
-type relation = private
+type relation =
   | Unary of (float -> float)
   | Binary of (float -> float -> float)
 
-type token = private
+type token =
   | Num of float
   | Operator of char * precedence * relation * bool
-  | Function of { name : string; f : relation }
+  | Function of { name : string; f : relation; prec : precedence }
   | LParen
   | RParen
   | Comma
-  | Eof
+  | End
   | Error of string
 
 val lex : t -> token * t
-val lexer : string -> t
+val mk_lexer : string -> t

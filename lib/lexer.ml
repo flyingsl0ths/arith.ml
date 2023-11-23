@@ -4,6 +4,7 @@ module Funcs = Map.Make (String)
 type t = { source : string; column : int; was_last_token_an_op : bool }
 
 type precedence =
+  | None
   | Term
   (*  + - *)
   | Factor
@@ -17,61 +18,54 @@ type relation =
 type token =
   | Num of float
   | Operator of char * precedence * relation * bool
-  | Function of { name : string; f : relation }
+  | Function of { name : string; f : relation; prec : precedence }
   | LParen
   | RParen
   | Comma
-  | Eof
+  | End
   | Error of string
 
-let lexer source = { source; column = 0; was_last_token_an_op = false }
-let ( <<< ) f g x = f @@ g x
+let mk_lexer source = { source; column = 0; was_last_token_an_op = false }
+let no_prec_func name f = Function { name; f; prec = None }
 
 let funcs =
   let recip n = 1.0 /. n in
   let to_radians x = x *. (Float.pi /. 180.) in
   let to_degrees x = x *. (180. /. Float.pi) in
   Funcs.add "nroot"
-    (Function { name = "nroot"; f = Binary (fun x y -> Float.pow x @@ recip y) })
-  @@ Funcs.add "floor" (Function { name = "floor"; f = Unary Float.floor })
-  @@ Funcs.add "deg" (Function { name = "deg"; f = Unary to_degrees })
-  @@ Funcs.add "tan" (Function { name = "tan"; f = Unary Float.tan })
-  @@ Funcs.add "sqrt" (Function { name = "sqrt"; f = Unary Float.sqrt })
-  @@ Funcs.add "sinh" (Function { name = "sinh"; f = Unary Float.sinh })
-  @@ Funcs.add "sin" (Function { name = "sin"; f = Unary Float.sin })
-  @@ Funcs.add "sec"
-       (Function { name = "sec"; f = Unary (recip <<< Float.cos) })
-  @@ Funcs.add "round" (Function { name = "round"; f = Unary Float.round })
-  @@ Funcs.add "rad" (Function { name = "rad"; f = Unary to_radians })
-  @@ Funcs.add "log10" (Function { name = "log10"; f = Unary Float.log10 })
+    (no_prec_func "nroot" @@ Binary (fun x y -> Float.pow x @@ recip y))
+  @@ Funcs.add "floor" (no_prec_func "floor" @@ Unary Float.floor)
+  @@ Funcs.add "deg" (no_prec_func "deg" @@ Unary to_degrees)
+  @@ Funcs.add "tanh" (no_prec_func "tanh" @@ Unary Float.tanh)
+  @@ Funcs.add "tan" (no_prec_func "tan" @@ Unary Float.tan)
+  @@ Funcs.add "sqrt" (no_prec_func "sqrt" @@ Unary Float.sqrt)
+  @@ Funcs.add "sinh" (no_prec_func "sinh" @@ Unary Float.sinh)
+  @@ Funcs.add "sin" (no_prec_func "sin" @@ Unary Float.sin)
+  @@ Funcs.add "sec" (no_prec_func "sec" @@ Unary (recip <<< Float.cos))
+  @@ Funcs.add "round" (no_prec_func "round" @@ Unary Float.round)
+  @@ Funcs.add "rad" (no_prec_func "rad" @@ Unary to_radians)
+  @@ Funcs.add "log10" (no_prec_func "log10" @@ Unary Float.log10)
   @@ Funcs.add "log"
-       (Function
-          {
-            name = "log";
-            f = Binary (fun n m -> Float.log @@ (n /. Float.log m));
-          })
-  @@ Funcs.add "ln" (Function { name = "ln"; f = Unary Float.log })
-  @@ Funcs.add "exp2" (Function { name = "exp2"; f = Unary Float.exp2 })
-  @@ Funcs.add "exp" (Function { name = "exp"; f = Unary Float.exp })
-  @@ Funcs.add "csc"
-       (Function { name = "csc"; f = Unary (recip <<< Float.sin) })
-  @@ Funcs.add "cot"
-       (Function { name = "cot"; f = Unary (recip <<< Float.tan) })
-  @@ Funcs.add "cosh" (Function { name = "cosh"; f = Unary Float.cosh })
-  @@ Funcs.add "cos" (Function { name = "cos"; f = Unary Float.cos })
-  @@ Funcs.add "ceil" (Function { name = "ceil"; f = Unary Float.ceil })
-  @@ Funcs.add "atan" (Function { name = "atan"; f = Unary Float.atan })
-  @@ Funcs.add "asin" (Function { name = "asin"; f = Unary Float.asin })
+       (no_prec_func "log"
+       @@ Binary (fun n m -> Float.log @@ (n /. Float.log m)))
+  @@ Funcs.add "ln" (no_prec_func "ln" @@ Unary Float.log)
+  @@ Funcs.add "exp2" (no_prec_func "exp2" @@ Unary Float.exp2)
+  @@ Funcs.add "exp" (no_prec_func "exp" @@ Unary Float.exp)
+  @@ Funcs.add "csc" (no_prec_func "csc" @@ Unary (recip <<< Float.sin))
+  @@ Funcs.add "cot" (no_prec_func "cot" @@ Unary (recip <<< Float.tan))
+  @@ Funcs.add "cosh" (no_prec_func "cosh" @@ Unary Float.cosh)
+  @@ Funcs.add "cos" (no_prec_func "cos" @@ Unary Float.cos)
+  @@ Funcs.add "ceil" (no_prec_func "ceil" @@ Unary Float.ceil)
+  @@ Funcs.add "atan" (no_prec_func "atan" @@ Unary Float.atan)
+  @@ Funcs.add "asin" (no_prec_func "asin" @@ Unary Float.asin)
   @@ Funcs.add "asec"
-       (Function { name = "asec"; f = Unary (fun x -> Float.acos (1.0 /. x)) })
+       (no_prec_func "asec" @@ Unary (fun x -> Float.acos (1.0 /. x)))
   @@ Funcs.add "acsc"
-       (Function { name = "acsc"; f = Unary (fun x -> Float.asin (1.0 /. x)) })
+       (no_prec_func "acsc" @@ Unary (fun x -> Float.asin (1.0 /. x)))
   @@ Funcs.add "acot"
-       (Function { name = "acot"; f = Unary (fun x -> Float.atan (1.0 /. x)) })
-  @@ Funcs.add "acos" (Function { name = "acos"; f = Unary Float.acos })
-  @@ Funcs.add "abs"
-       (Function { name = "abs"; f = Unary Float.abs })
-       Funcs.empty
+       (no_prec_func "acot" @@ Unary (fun x -> Float.atan (1.0 /. x)))
+  @@ Funcs.add "acos" (no_prec_func "acos" @@ Unary Float.acos)
+  @@ Funcs.add "abs" (no_prec_func "abs" @@ Unary Float.abs) Funcs.empty
 
 let discard = function ' ' -> true | '\t' -> true | _ -> false
 
@@ -103,16 +97,23 @@ let single_char_token is_unary_minus = function
   | '^' -> Operator ('^', Factor, Binary (fun x y -> x ** y), is_left_assoc '^')
   | '-' when not is_unary_minus ->
       Operator ('-', Term, Binary ( -. ), is_left_assoc '-')
-  | '-' when is_unary_minus -> Function { name = "-"; f = Unary (fun n -> -.n) }
-  | '!' -> Function { name = "!"; f = Unary factorial }
+  | '-' when is_unary_minus ->
+      Function { name = "-"; f = Unary (fun n -> -.n); prec = Unary }
+  | '!' -> Function { name = "!"; f = Unary factorial; prec = Unary }
   | '(' -> LParen
   | ')' -> RParen
   | ',' -> Comma
-  | _ -> Eof
+  | _ -> End
 
 let make_func ({ source; column; _ } as lexer) fs =
+  let source_len = String.length source in
   match
-    List.find_opt (fun f -> String.take (String.length f) source == f) fs
+    List.find_opt
+      (fun f ->
+        let func_name_length = String.length f in
+        if source_len < func_name_length then false
+        else String.equal f @@ String.sub source column (String.length f))
+      fs
   with
   | Some f ->
       let offset = String.length f in
@@ -124,19 +125,24 @@ let make_func ({ source; column; _ } as lexer) fs =
         } )
   | None -> (Error "Unknown function name", lexer)
 
-let is_name source func_name =
-  let len = String.length source in
-  let func_name_length = String.length func_name in
-  len >= func_name_length && String.take func_name_length source == func_name
-
-let is_not_exp_functions source =
-  (not @@ is_name source "exp") || (not @@ is_name source "exp2")
-
-let match_functions_or_error ({ source; column; _ } as lexer) = function
+let match_functions_or_error ({ source; column; _ } as lexer) =
+  let is_not_name { source; column; _ } func_name =
+    let source_len = String.length source in
+    let func_name_length = String.length func_name in
+    source_len >= func_name_length
+    && not
+       @@ String.equal
+            (String.sub source column (column + func_name_length))
+            func_name
+  in
+  let is_not_exp_functions lexer =
+    is_not_name lexer "exp" || is_not_name lexer "exp2"
+  in
+  function
   | 'a' ->
       make_func lexer [ "abs"; "acos"; "acot"; "acsc"; "asec"; "asin"; "atan" ]
   | 'c' -> make_func lexer [ "ceil"; "cosh"; "cos"; "cot"; "csc" ]
-  | 'e' when String.length source == 1 || is_not_exp_functions source ->
+  | 'e' when String.length source == 1 || is_not_exp_functions lexer ->
       ( Num 2.71828182845904523536028747135266250,
         {
           source = String.tl source;
@@ -145,7 +151,7 @@ let match_functions_or_error ({ source; column; _ } as lexer) = function
         } )
   | 'e' -> make_func lexer [ "exp2"; "exp" ]
   | 'l' -> make_func lexer [ "ln"; "log10"; "log" ]
-  | 'p' when is_name source "pi" ->
+  | 'p' ->
       ( Num Float.pi,
         {
           source = String.drop 2 source;
@@ -180,29 +186,28 @@ let is_unary_minus { source; column; was_last_token_an_op; _ } =
      let second = (String.hd <<< String.tl <<< String.tl) source in
      Char.is_digit second || second == '-'
 
-let parse_num source column =
+let parse_num ({ source; column; _ } as lexer) =
   let num, rest = String.span (fun c -> Char.is_digit c || c = '.') source in
   let count_decimals =
     String.fold_left
       (fun count current -> if current == '.' then count + 1 else count)
       0
   in
-  let tk =
-    if count_decimals num > 1 then
-      Error
+  if count_decimals num > 1 then
+    ( Error
         ("Syntax error(1," ^ string_of_int column
-       ^ "): floating point number cannot contain more than one '.'")
-    else Num (float_of_string num)
-  in
-  ( tk,
-    {
-      source = rest;
-      column = column + String.length num;
-      was_last_token_an_op = false;
-    } )
+       ^ "): floating point number cannot contain more than one '.'"),
+      lexer )
+  else
+    ( Num (float_of_string num),
+      {
+        source = rest;
+        column = column + String.length num;
+        was_last_token_an_op = false;
+      } )
 
 let rec lex ({ source; column; _ } as lexer) =
-  if String.null source then (Eof, lexer)
+  if String.null source then (End, lexer)
   else
     match String.hd source with
     | c when discard c -> lex @@ skip_whitespace lexer
@@ -213,5 +218,5 @@ let rec lex ({ source; column; _ } as lexer) =
             column = column + 1;
             was_last_token_an_op = is_op c;
           } )
-    | d when Char.is_digit d -> parse_num source column
+    | d when Char.is_digit d -> parse_num lexer
     | c -> match_functions_or_error lexer c

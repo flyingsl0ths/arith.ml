@@ -1,3 +1,5 @@
+let ( <<< ) f g x = f @@ g x
+
 module Array = struct
   include Array
 
@@ -7,7 +9,7 @@ end
 module String = struct
   include String
 
-  let tl cs = String.sub cs 1 @@ (String.length cs - 1)
+  let tl = function "" -> "" | cs -> String.sub cs 1 (String.length cs - 1)
   let hd = function "" -> ' ' | cs -> String.get cs 0
   let null = function "" -> true | _ -> false
 
@@ -23,7 +25,7 @@ module String = struct
               span' (fst acc ^ Char.escaped @@ hd', rest) rest
           | _ -> acc
         in
-        span' ("", "") cs
+        span' ("", cs) cs
 
   let dropWhile f = function
     | "" -> ""
@@ -31,7 +33,6 @@ module String = struct
         let rec dropWhile' cs' =
           let hd' = hd cs' in
           match cs' with
-          | "" -> cs'
           | cs'' when f hd' ->
               let rest = tl cs'' in
               dropWhile' rest
@@ -39,24 +40,25 @@ module String = struct
         in
         dropWhile' cs
 
-  let rec drop n cs =
+  let drop n cs =
     let length' = length cs in
+    let rec drop' n' cs' =
+      match cs' with _ when n' != 0 -> drop' (n' - 1) @@ tl cs' | _ -> cs'
+    in
     match cs with
-    | "" -> ""
-    | _ when n > length' -> cs
-    | _ when n < length' -> ""
-    | _ when n != 0 -> drop (n - 1) @@ tl cs
-    | _ -> cs
+    | _ when n <= 0 -> cs
+    | _ when n > length' -> ""
+    | _ -> drop' n cs
 
   let take n = function
     | "" -> ""
     | cs when n > 0 && n <= length cs ->
-        let rec take' n acc = function
-          | cs' when n != 0 ->
-              take' (n - 1) (tl cs') (acc ^ Char.escaped @@ hd cs')
-          | cs' -> cs'
+        let rec take' n' acc = function
+          | cs' when n' != n ->
+              take' (n' + 1) (acc ^ Char.escaped @@ hd cs') @@ tl cs'
+          | _ -> acc
         in
-        take' n cs ""
+        take' 0 "" cs
     | cs -> cs
 end
 
