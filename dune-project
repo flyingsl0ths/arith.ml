@@ -11,16 +11,12 @@
 
 (maintainers "flyingsl0ths")
 
-(license LICENSE)
-
-; (documentation https://url/to/documentation)
+(license GPL-3.0-only)
 
 (package
  (name arith)
  (synopsis "A bc clone")
  (description "A cli calculator")
- (depends ocaml dune)
- (tags
-  (topics "to describe" your project)))
+ (depends ocaml dune (ounit2 :with-test))
+ )
 
-; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project

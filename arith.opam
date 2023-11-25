@@ -4,13 +4,13 @@ synopsis: "A bc clone"
 description: "A cli calculator"
 maintainer: ["flyingsl0ths"]
 authors: ["flyingsl0ths"]
-license: "LICENSE"
-tags: ["topics" "to describe" "your" "project"]
+license: "GPL-3.0-only"
 homepage: "https://github.com/flyingsl0ths/arith.ml"
 bug-reports: "https://github.com/flyingsl0ths/arith.ml/issues"
 depends: [
   "ocaml"
   "dune" {>= "3.8"}
+  "ounit2" {with-test}
   "odoc" {with-doc}
 ]
 build: [
