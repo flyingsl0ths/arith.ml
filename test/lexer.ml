@@ -41,31 +41,36 @@ let string_take _ =
 
 let empty_source _ =
   let lxr = mk_lexer "" in
-  let token, next = lex lxr in
+  let Token (token_column, token), next = lex lxr in
   assert_equal lxr next;
+  assert_equal 0 token_column;
   assert_equal End token
 
 let whitespace _ =
   let lxr = mk_lexer "   1" in
-  let token, { source; column; _ } = lex lxr in
+  let Token (token_column, token), { source; column; _ } = lex lxr in
   assert_equal "" source;
   assert_equal 4 column;
+  assert_equal 3 token_column;
   assert_equal (Num 1.0) token
 
 let whole_number _ =
   let lxr = mk_lexer "1" in
-  let token, { source; column; _ } = lex lxr in
+  let Token (token_column, token), { source; column; _ } = lex lxr in
   assert_equal "" source;
   assert_equal 1 column;
+  assert_equal 0 token_column;
   assert_equal (Num 1.) token
 
 let decimal _ =
   let lxr = mk_lexer "1.0" in
-  let token, { source; column; _ } = lex lxr in
+  let Token (token_column, token), { source; column; _ } = lex lxr in
   assert_equal "" source;
   assert_equal 3 column;
+  assert_equal 0 token_column;
   assert_equal (Num 1.0) token
 
+(*TODO: Finish updating tests to work with numbered_token type*)
 let single_chars _ =
   let cmp_op tk1 tk2 =
     match (tk1, tk2) with
@@ -85,21 +90,24 @@ let single_chars _ =
 
   let const n _ = n in
 
-  let type_of_single c tk =
-    match c with
-    | '!' ->
-        cmp_op
-          (Function { name = "!"; f = Unary (fun n -> n); prec = Unary })
-          tk
-    | '*' -> cmp_op (Operator ('*', Factor, Binary const, true)) tk
-    | '^' -> cmp_op (Operator ('^', Factor, Binary const, false)) tk
-    | '+' -> cmp_op (Operator ('+', Term, Binary const, true)) tk
-    | '/' -> cmp_op (Operator ('/', Factor, Binary const, true)) tk
-    | '%' -> cmp_op (Operator ('%', Factor, Binary const, true)) tk
-    | '(' -> cmp_op LParen tk
-    | ')' -> cmp_op RParen tk
-    | ',' -> cmp_op Comma tk
-    | c -> assert_bool ("Unknown token " ^ Char.escaped c) false
+  let type_of_single c (Token (n, tk)) =
+    match n with
+    | 0 -> (
+        match c with
+        | '!' ->
+            cmp_op
+              (Function { name = "!"; f = Unary (fun n -> n); prec = Unary })
+              tk
+        | '*' -> cmp_op (Operator ('*', Factor, Binary const, true)) tk
+        | '^' -> cmp_op (Operator ('^', Factor, Binary const, false)) tk
+        | '+' -> cmp_op (Operator ('+', Term, Binary const, true)) tk
+        | '/' -> cmp_op (Operator ('/', Factor, Binary const, true)) tk
+        | '%' -> cmp_op (Operator ('%', Factor, Binary const, true)) tk
+        | '(' -> cmp_op LParen tk
+        | ')' -> cmp_op RParen tk
+        | ',' -> cmp_op Comma tk
+        | c -> assert_bool ("Unknown token " ^ Char.escaped c) false)
+    | _ -> assert_bool "Invalid token column" false
   in
   String.iter
     (fun c -> (type_of_single c <<< fst <<< lex <<< mk_lexer) @@ Char.escaped c)
@@ -107,8 +115,9 @@ let single_chars _ =
 
 let double_floating_point _ =
   let lxr = mk_lexer "1..0" in
-  let token, { source; column; _ } = lex lxr in
+  let Token (token_column, token), { source; column; _ } = lex lxr in
   assert_equal "1..0" source;
+  assert_equal 0 token_column;
   assert_equal 0 column;
   assert_equal
     (Error
@@ -135,9 +144,10 @@ let cmp_func expected actual =
 let functions _ =
   let test_func name =
     let lxr = mk_lexer name in
-    let token, { source; column; _ } = lex lxr in
+    let Token (token_column, token), { source; column; _ } = lex lxr in
     assert_equal "" source;
     assert_equal (String.length name) column;
+    assert_equal token_column 0;
     cmp_func (Function { name; f = Binary (fun n _ -> n); prec = None }) token
   in
   List.iter test_func
@@ -174,50 +184,65 @@ let functions _ =
 
 let unknown_function _ =
   let lxr = mk_lexer "abc" in
-  let token, { source; column; _ } = lex lxr in
+  let Token (token_column, token), { source; column; _ } = lex lxr in
   assert_equal "abc" source;
   assert_equal 0 column;
+  assert_equal 0 token_column;
   assert_equal (Error "Unknown function name") token
 
 let unknown_token _ =
   let lxr = mk_lexer ">" in
-  let token, { source; column; _ } = lex lxr in
+  let Token (token_column, token), { source; column; _ } = lex lxr in
   assert_equal ">" source;
   assert_equal 0 column;
+  assert_equal 0 token_column;
   assert_equal (Error "Unknown token") token
 
 let negative_number _ =
   let lxr = mk_lexer "-10" in
-  let token, ({ source; column; _ } as next) = lex lxr in
+  let Token (token_column, token), ({ source; column; _ } as next) = lex lxr in
   assert_equal "10" source;
   assert_equal 1 column;
+  assert_equal 0 token_column;
   cmp_func
     (Function { name = "-"; f = Unary (fun n -> -.n); prec = Unary })
     token;
 
-  let token', { source = source'; column = column'; _ } = lex next in
+  let Token (token_column', token'), { source = source'; column = column'; _ } =
+    lex next
+  in
   assert_equal "" source';
   assert_equal 3 column';
+  assert_equal 1 token_column';
   assert_equal (Num 10.0) token'
 
 let negative_num_as_binary_op_operand _ =
   let lxr = mk_lexer "+ -10" in
-  let token, ({ source; column; _ } as next) = lex lxr in
+  let Token (token_column, token), ({ source; column; _ } as next) = lex lxr in
   assert_equal " -10" source;
   assert_equal 1 column;
+  assert_equal 0 token_column;
   cmp_operator (Operator ('+', Term, Binary ( +. ), true)) token;
 
-  let token', ({ source = source'; column = column'; _ } as last) = lex next in
+  let ( Token (token_column', token'),
+        ({ source = source'; column = column'; _ } as last) ) =
+    lex next
+  in
 
   assert_equal "10" source';
   assert_equal 3 column';
+  assert_equal 2 token_column';
   cmp_func
     (Function { name = "-"; f = Unary (fun n -> -.n); prec = Unary })
     token';
 
-  let token'', { source = source''; column = column''; _ } = lex last in
+  let ( Token (token_column'', token''),
+        { source = source''; column = column''; _ } ) =
+    lex last
+  in
   assert_equal "" source'';
   assert_equal 5 column'';
+  assert_equal 3 token_column'';
   assert_equal (Num 10.0) token''
 
 let extensions_suite =

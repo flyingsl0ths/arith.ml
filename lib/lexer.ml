@@ -25,6 +25,8 @@ type token =
   | End
   | Error of string
 
+type numbered_token = Token of int * token
+
 let mk_lexer source = { source; column = 0; was_last_token_an_op = false }
 let no_prec_func name f = Function { name; f; prec = None }
 
@@ -194,12 +196,14 @@ let parse_num ({ source; column; _ } as lexer) =
       0
   in
   if count_decimals num > 1 then
-    ( Error
-        ("Syntax error(1," ^ string_of_int column
-       ^ "): floating point number cannot contain more than one '.'"),
+    ( Token
+        ( column,
+          Error
+            ("Syntax error(1," ^ string_of_int column
+           ^ "): floating point number cannot contain more than one '.'") ),
       lexer )
   else
-    ( Num (float_of_string num),
+    ( Token (column, Num (float_of_string num)),
       {
         source = rest;
         column = column + String.length num;
@@ -207,16 +211,18 @@ let parse_num ({ source; column; _ } as lexer) =
       } )
 
 let rec lex ({ source; column; _ } as lexer) =
-  if String.null source then (End, lexer)
+  if String.null source then (Token (column, End), lexer)
   else
     match String.hd source with
     | c when discard c -> lex @@ skip_whitespace lexer
     | c when is_single c ->
-        ( single_char_token (is_unary_minus lexer) c,
+        ( Token (column, single_char_token (is_unary_minus lexer) c),
           {
             source = String.tl source;
             column = column + 1;
             was_last_token_an_op = is_op c;
           } )
     | d when Char.is_digit d -> parse_num lexer
-    | c -> match_functions_or_error lexer c
+    | c ->
+        let tk, lexer' = match_functions_or_error lexer c in
+        (Token (column, tk), lexer')

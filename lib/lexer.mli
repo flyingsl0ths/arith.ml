@@ -22,5 +22,7 @@ type token =
   | End
   | Error of string
 
-val lex : t -> token * t
+type numbered_token = Token of int * token
+
+val lex : t -> numbered_token * t
 val mk_lexer : string -> t
