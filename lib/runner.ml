@@ -1,9 +1,11 @@
 open Lexer
 
+type parser_error = ParserError of int * string
+
 type parser = {
   output : Lexer.token list;
   operators : Lexer.token list;
-  result : (string, Lexer.token list) Either.t;
+  result : (parser_error, Lexer.token list) Either.t;
 }
 
 let is_lparen = function Lexer.LParen -> true | _ -> false
