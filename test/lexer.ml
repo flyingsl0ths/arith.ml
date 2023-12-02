@@ -70,7 +70,6 @@ let decimal _ =
   assert_equal 0 token_column;
   assert_equal (Num 1.0) token
 
-(*TODO: Finish updating tests to work with numbered_token type*)
 let single_chars _ =
   let cmp_op tk1 tk2 =
     match (tk1, tk2) with
