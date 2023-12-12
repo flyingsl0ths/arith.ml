@@ -17,6 +17,6 @@
  (name arith)
  (synopsis "A bc clone")
  (description "A cli calculator")
- (depends ocaml dune (ounit2 :with-test))
+ (depends ocaml dune (ounit2 :with-test) ppx_deriving)
  )
 

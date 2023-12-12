@@ -10,6 +10,7 @@ type precedence =
   | Factor
   (* * / % ^ *)
   | Unary (* ! - *)
+[@@deriving eq, ord]
 
 type relation =
   | Unary of (float -> float)
