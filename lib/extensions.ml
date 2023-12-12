@@ -1,4 +1,5 @@
 let ( <<< ) f g x = f @@ g x
+let rec until pred f a = if pred a then a else until pred f @@ f a
 
 module Array = struct
   include Array
