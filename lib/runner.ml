@@ -93,8 +93,6 @@ let on_token_type ({ output; operators; result } as parser')
   | Lexer.Operator _ -> on_operator parser' token
   | _ -> parser'
 
-(* type t = { source : string; column : int; was_last_token_an_op : bool } *)
-
 let organize lexer =
   let rec parse (lexer', parser') =
     let (Token (_, token) as token'), lexer'' = Lexer.lex lexer' in
