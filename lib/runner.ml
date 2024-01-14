@@ -1,5 +1,6 @@
 open Lexer
 open Extensions
+open Option
 
 type parser_error = ParserError of int * string
 
@@ -122,3 +123,94 @@ let organize lexer =
     in
     result
 
+let arity_of = function Unary _ -> 1 | Binary _ -> 2
+
+let op_error_message token_column =
+  "Line(1,"
+  ^ (string_of_int @@ (token_column + 1))
+  ^ "): Too many operators, too few operands."
+
+let on_unary_op output f token_column =
+  match output with
+  | top :: output' -> Either.right @@ (f top :: output')
+  | _ -> Either.left @@ op_error_message token_column
+
+let on_binary_op f op token_column = function
+  | left :: right :: output' ->
+      if Char.equal op '/' && Float.floor right = 0.0 then
+        Either.left @@ "Line(1,"
+        ^ (string_of_int @@ (token_column + 1))
+        ^ "): Division by zero"
+      else Either.right (f left right :: output')
+  | _ -> Either.left @@ op_error_message token_column
+
+let on_operator (Either.Left message) _ = Either.left message
+
+let on_operator (Either.Right output) (Token (token_column, token)) =
+  match token with
+  | Function { name; f = Unary f; _ }
+    when String.equal name "-" || String.equal name "!" ->
+      on_unary_op output f token_column
+  | Operator (op, _, Binary f, _) -> on_binary_op f op token_column output
+  | _ ->
+      Either.left @@ "Line(1,"
+      ^ (string_of_int @@ (token_column + 1))
+      ^ "): Syntax error unexpect token"
+
+let apply f args =
+  match f with
+  | Binary f' -> f' (List.hd args) (List.hd @@ List.tl args)
+  | Unary f' -> f' @@ List.hd args
+
+let on_func (Either.Left message) _ = Either.left message
+
+let on_func (Either.Right output)
+    (Token (token_column, Function { name; f; _ })) =
+  if List.length output < arity_of f then
+    Either.left @@ "Line(1,"
+    ^ string_of_int (token_column + 1)
+    ^ "): Too few arguments to function, '" ^ name ^ "'"
+  else
+    let arity = arity_of f in
+    let output', args, _ =
+      until
+        (fun (output', _, arity') -> arity' == 0 || List.length output' == 0)
+        (fun (output, args, arity') ->
+          (List.tl output, List.hd output :: args, arity' - 1))
+        (output, [], arity)
+    in
+    Either.right @@ (apply f (List.rev args) :: output')
+
+let on_token (bottom :: rest, result) =
+  match bottom with
+  | Token (_, Num n) ->
+      (rest, Either.map_right (fun output -> n :: output) result)
+  | Token (_, Operator _) as op -> (rest, on_operator result op)
+  | Token (_, Function _) as fn -> (rest, on_func result fn)
+  | Token (column, token) ->
+      ( rest,
+        Either.left @@ "Line(1," ^ string_of_int column ^ "): '"
+        ^ lexeme_of token ^ "'" )
+
+let calculate =
+  let on_right stack =
+    snd
+    @@ until
+         (fun (stack, result) ->
+           List.length stack == 0 || Either.is_left result)
+         on_token
+         (List.rev stack, Either.right [])
+  in
+  function
+  | Either.Left (ParserError (column, message)) ->
+      Either.left @@ "Line(1," ^ string_of_int column ^ "): " ^ message
+  | Either.Right stack -> (
+      let output = on_right stack in
+      match output with
+      | Left _ as error_message -> error_message
+      | Right (top :: _) -> Either.right top
+      | _ ->
+          let column_of (Token (column, _)) = column in
+          Either.left @@ "Line(1,"
+          ^ (string_of_int @@ column_of @@ List.hd stack)
+          ^ "): Too many operators, too few operands")
